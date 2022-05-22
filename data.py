@@ -12,7 +12,7 @@ import numpy.random as nrd
 import tool
 import update
 
-N = 400
+N = 500
 NT = 4
 NX = 3
 # NV = NX + 1   # varying coefficient (include intercept)
@@ -23,7 +23,7 @@ K = 2  # order (more explicit, degree (cubic)  (so number of spline is NK+K)
 D = 3  # degree = K + 1
 NH = 3      # transition model
 NB = NK + K - 1        # number of b-spline 
-Rep = 200
+Rep = 1
 Iter = 5000
 burnin = 4000
 NG = 100               # number of grid
@@ -42,7 +42,7 @@ all_y = torch.zeros(Rep, N, NT, NG)
 all_eta = torch.zeros(Rep, N, NT, NG)
 torch.set_default_tensor_type(torch.DoubleTensor)
 for r in range(Rep):
-    nrd.seed(66+r)
+    nrd.seed(66+3)
     x = np.zeros(shape=[N, NT, NX+1, NG])
     # x[:, :, 0] = 1 # intercept
     # x[:, :, 0] = np.tile(nrd.binomial(1, 0.4, N)[:, np.newaxis, np.newaxis], (1, NT, NG))   # time-invariant and grid-invariant covariates
@@ -124,8 +124,21 @@ for r in range(Rep):
     # t_eta = MultivariateNormal(eta_mean0, eta_cov0).sample((N, NT)) + MultivariateNormal(eta_mean1, eta_cov1).sample((N, NT))
     s1 = torch.normal(0, sqrt(1.2), (N, NT))
     s2 = torch.normal(0, sqrt(0.6), (N, NT))
-    t_eta = torch.unsqueeze(s1, 2) * sqrt(2) * torch.sin(2*pi*grid) + torch.unsqueeze(s2, 2) * (2) * torch.cos(2*pi*grid)
+    # t_eta = torch.unsqueeze(s1, 2) * sqrt(2) * torch.sin(2*pi*grid) + torch.unsqueeze(s2, 2) * (2) * torch.cos(2*pi*grid)
     # t_eta = Gamma(3, 5).sample((N, NT, NG))
+    # mid_grid = torch.Tensor(math.ceil((0 + 99) / 2))
+    # grid = torch.linspace(0, 1, NG)
+    dd = torch.unsqueeze(grid, 1) - torch.unsqueeze(grid, 0)  # NG * NG
+    H_d = torch.exp(-torch.abs(dd))  # distance for the covariance
+    # H_d = torch.exp(-torch.square(dd))  # distance for the covariance
+    sigma_s = torch.Tensor([0.5])
+    psi_1, psi_2 = 0.25, 0.36
+    cov_1 = torch.square(sigma_s) * torch.pow(H_d, psi_1)
+    cov_2 = torch.square(sigma_s) * torch.pow(H_d, psi_2)
+    label = torch.Tensor(nrd.binomial(1, 0.7, (N, NT, 1)))
+    eta_1 = MultivariateNormal(torch.zeros(NG), cov_1).sample((N, NT))
+    eta_2 = MultivariateNormal(torch.zeros(NG), cov_2).sample((N, NT))
+    t_eta = label * eta_1 + (1-label) * eta_2
     all_eta[r] = t_eta
     # t_mean = torch.sum(t_beta[0] * torch.unsqueeze(x[location0[0], location0[1]], 2), 1)
     t_mean = torch.zeros(N, NT, NG)
@@ -143,8 +156,8 @@ for r in range(Rep):
     # torch.sum(torch.abs(diff_ylikeli) < 1)
     all_y[r] = y
     print("End of one replication")
-torch.save(all_x, "x1.pt")
-torch.save(all_y, "y1.pt")
-torch.save(all_t_state, 't_state1.pt')
-torch.save(all_h, "h1.pt")
-torch.save(all_eta, "t_eta1.pt")
+torch.save(all_x, "x.pt")
+torch.save(all_y, "y.pt")
+torch.save(all_t_state, 't_state.pt')
+torch.save(all_h, "h.pt")
+torch.save(all_eta, "t_eta.pt")
