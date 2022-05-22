@@ -207,7 +207,7 @@ class MCMC(tool.Tools):
     def update_gamma_phi(self, tau_phi):
         # prior
         alpha_gamma = 1
-        beta_gamma = 0.1
+        beta_gamma = 0.01
         gamma_phi = nrd.gamma(alpha_gamma + 1, 1 / (beta_gamma + (tau_phi / 2)))
         return torch.Tensor(gamma_phi)
 
@@ -444,7 +444,7 @@ class MCMC(tool.Tools):
 
 
         # ------------------------------------------------Beta is the verying coefficient-----------------------------------
-    def update_vc(self, y, x, state, beta, sigma, thres, bs_value, w, p_tau, c_beta, accept_beta, tau_beta):
+    def update_vc(self, y, x, state, beta, sigma, thres, bs_value, w, c_beta, accept_beta, tau_beta):
         # ----------------Args: beta[NS * NV * NB] tau is penalty coefficient for Bspline coefficient--------------
         #-----------------Args: w: N * NT * NG   sigma_beta : [NS]  tau * beta [NS * NV]
         # state = state.numpy()
@@ -504,11 +504,11 @@ class MCMC(tool.Tools):
                 #     p3 = mm.log_prob(beta[s, v])
                 #     star3 = mm.log_prob(star)
                 ############--------------- smooth penalty---------------------------#######
-                p4 = - 0.5 / p_tau[s, v] * torch.matmul(torch.matmul(beta[s, v], self.PK), torch.unsqueeze(beta[s, v], 1))
-                star4 = - 0.5 / p_tau[s, v] * torch.matmul(torch.matmul(star, self.PK),
-                                                        torch.unsqueeze(star, 1))
-                # p4 = 0
-                # star4 = 0
+                # p4 = - 0.5 / p_tau[s, v] * torch.matmul(torch.matmul(beta[s, v], self.PK), torch.unsqueeze(beta[s, v], 1))
+                # star4 = - 0.5 / p_tau[s, v] * torch.matmul(torch.matmul(star, self.PK),
+                #                                         torch.unsqueeze(star, 1))
+                p4 = 0
+                star4 = 0
                 log_ratio = torch.sum(star1) + star2 - torch.sum(p1) - p2 + star3 - p3 + star4 - p4
                 ratio = torch.exp(log_ratio) if log_ratio < 0 else 1
                 rand_ratio = nrd.rand(1)[0]
@@ -616,7 +616,7 @@ class MCMC(tool.Tools):
     def update_gamma_beta(self, tau_beta):
         # prior
         alpha_gamma = 1
-        beta_gamma = 0.1
+        beta_gamma = 0.01
         # print(tau_beta)
         gamma_beta = nrd.gamma(alpha_gamma + (self.NB + 1) / 2, 1 / (beta_gamma + (tau_beta.numpy() / 2)))
         # gamma_beta = nrd.gamma(alpha_gamma + 1, 1 / (beta_gamma + (tau_beta.numpy() / 2)))
@@ -878,13 +878,15 @@ class MCMC(tool.Tools):
         alpha = torch.zeros(self.NS)
         beta = torch.zeros(self.NS)
         res = y - mean - w  # N * NT * NG
-        p_alpha = 0.001 # prior for gamma    zxx modified
-        p_beta = 0.001
+        # p_alpha = 0.001 # prior for gamma    zxx modified
+        # p_beta = 0.001
+        p_alpha = 8 # prior for gamma    zxx modified
+        p_beta = 3
         p = torch.matmul(torch.matmul(torch.unsqueeze(vc, 2), self.PK), torch.unsqueeze(vc, 3))[:, :, 0, 0] / p_tau
         for s in range(self.NS):
             loc = torch.where(state == s)
-            # alpha[s] = (loc[0].shape[0] * self.NG) / 2 + self.NV + p_alpha  # Prior II
-            alpha[s] = (loc[0].shape[0] * self.NG) / 1.5 + p_alpha
+            alpha[s] = (loc[0].shape[0] * self.NG) / 2 + self.NV + p_alpha  # Prior II
+            # alpha[s] = (loc[0].shape[0] * self.NG) / 1.5 + p_alpha
             beta[s] = torch.sum(torch.square(res[loc[0], loc[1]])) / 2 + p_beta
             # print("s:%d, alpha_s:%.6f"%(s,len(sample[0])))
         sigma = 1 / Gamma(alpha, beta).sample()
@@ -906,6 +908,8 @@ class MCMC(tool.Tools):
 
     def update_sigmaz(self, mu_z, Z):
         #-----------------------------Args: Z: NS * G*  NG; mu_z: NS * NG------------
+        # zeta_1 = 1
+        # zeta_2 = 0.01
         zeta_1 = 1
         zeta_2 = 0.01
         cov = torch.sum(torch.square(Z - torch.unsqueeze(mu_z, 0)), 0)  # NG
@@ -916,8 +920,10 @@ class MCMC(tool.Tools):
 
     def update_nu(self, Z, psi):
         #---------------Args: nu is the variance in the distance covariance  Z: G * NG--------
-        nu_1 = 1
-        nu_2 = 0.01
+        # nu_1 = 1
+        # nu_2 = 0.01
+        nu_1 = 2
+        nu_2 = 1
         H = torch.pow(self.H_d, psi)
         inv_H = torch.inverse(H)  # NG * NG
         b = torch.matmul(torch.matmul(torch.unsqueeze(Z, 1), inv_H), torch.unsqueeze(Z, 2)) # G * 1 * 1
