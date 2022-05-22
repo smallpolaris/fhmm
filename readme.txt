@@ -7,7 +7,7 @@ In the demo, we set rep to 1 to generate one dataset for simulation
 2. update.py is to sample parameters using MCMC and MH algorithm.
 
 
-3. tool.py contains some function to be used in other .py
+3. tool.py contains some function to be used in other files (.py).
 
 
 4. main.py is the main loop to get the estimators.
